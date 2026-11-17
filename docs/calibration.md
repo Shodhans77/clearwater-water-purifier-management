@@ -1,0 +1,5 @@
+# Calibration
+
+Before calibration, display ADC counts with an “uncalibrated” label. Record standard/reference, raw sample, date and operator. Configure slope/offset only after testing pH buffers, a TDS standard, turbidity standards and measured-volume flow calibration. The API applies `calibrated = raw × slope + offset` only when both values are configured. 450 pulses/L is an initial estimate; flow and cumulative volume are recomputed from pulse count using the configured factor. Example alert bands (TDS 500 ppm, pH 6.5–8.5, turbidity 5 NTU) are configurable operational warnings and require local review.
+
+The optional 0–100 Water Quality Score is only returned when all three sensors have complete calibration and the latest record contains calibrated TDS, pH and turbidity. It averages three bounded indicators: TDS `100 × (1 − TDS / (2 × configured TDS warning))`, pH `100 − 20 × abs(pH − 7)`, and turbidity `100 × (1 − turbidity / (2 × configured turbidity warning))`; each is clamped at zero. This is an informational monitoring indicator, not a potability or health claim.

@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum Role {
+  CUSTOMER
+  PROVIDER
+  ADMIN
+}
+enum Severity {
+  GREEN
+  YELLOW
+  RED
+}
+enum DeviceKind {
+  REAL
+  DEMO
+}
+model User {
+  id              String       @id @default(cuid())
+  email           String       @unique
+  username        String       @unique
+  passwordHash    String
+  role            Role
+  createdAt       DateTime     @default(now())
+  customerDevices Device[]     @relation("CustomerDevices")
+  memberships     Membership[]
+  serviceRequests ServiceRequest[] @relation("CustomerRequests")
+  billingRecords  BillingRecord[] @relation("CustomerBilling")
+  passwordResetTokens PasswordResetToken[]
+  @@map("users")
+}
+model Organization {
+  id        String       @id @default(cuid())
+  name      String
+  createdAt DateTime     @default(now())
+  members   Membership[]
+  buildings Building[]
+  devices   Device[]
+  technicians Technician[]
+  billingRecords BillingRecord[]
+}
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  user           User         @relation(fields: [userId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  @@unique([userId, organizationId])
+}
+model Building {
+  id             String       @id @default(cuid())
+  name           String
+  address        String
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  floors         Floor[]
+  devices        Device[]
+}
+model Floor {
+  id        String   @id @default(cuid())
+  label     String
+  buildingId String
+  building  Building @relation(fields: [buildingId], references: [id])
+  devices   Device[]
+  @@unique([buildingId, label])
+}
+model Device {
+  id             String       @id @default(cuid())
+  deviceId       String       @unique
+  name           String
+  kind           DeviceKind   @default(REAL)
+  active         Boolean      @default(true)
+  customerId     String?
+  customer       User?        @relation("CustomerDevices", fields: [customerId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  buildingId     String?
+  building       Building?    @relation(fields: [buildingId], references: [id])
+  floorId        String?
+  floor          Floor?       @relation(fields: [floorId], references: [id])
+  secretHash     String?
+  claimCodeHash  String?
+  lastSeen       DateTime?
+  createdAt      DateTime     @default(now())
+  telemetry      Telemetry[]
+  alerts         Alert[]
+  maintenance    Maintenance[]
+  calibration    Calibration?
+  serviceRequests ServiceRequest[]
+  billingRecords BillingRecord[]
+  @@index([customerId])
+  @@index([organizationId])
+}
+model Telemetry {
+  id              String   @id @default(cuid())
+  deviceId        String
+  device          Device   @relation(fields: [deviceId], references: [id])
+  receivedAt      DateTime @default(now())
+  deviceTimestamp DateTime?
+  sequence        BigInt?
+  rawTds          Int?
+  rawPh           Int?
+  rawTurbidity    Int?
+  tdsPpm          Float?
+  ph              Float?
+  turbidityNtu    Float?
+  flowLpm         Float?
+  pulseCount      Int?
+  cumulativeLitres Float?
+  leakage         Boolean?
+  temperatureC    Float?
+  humidityPct     Float?
+  sensorHealth    Json?
+  @@unique([deviceId, sequence])
+  @@index([deviceId, receivedAt])
+}
+model Calibration {
+  id               String   @id @default(cuid())
+  deviceId         String   @unique
+  device           Device   @relation(fields: [deviceId], references: [id])
+  tdsSlope         Float?
+  tdsOffset        Float?
+  phSlope          Float?
+  phOffset         Float?
+  turbiditySlope   Float?
+  turbidityOffset  Float?
+  pulsesPerLitre   Float    @default(450)
+  tdsWarning       Float    @default(500)
+  phLowWarning     Float    @default(6.5)
+  phHighWarning    Float    @default(8.5)
+  turbidityWarning Float    @default(5)
+  updatedAt        DateTime @updatedAt
+}
+model Alert {
+  id             String    @id @default(cuid())
+  deviceId       String
+  device         Device    @relation(fields: [deviceId], references: [id])
+  code           String
+  title          String
+  severity       Severity
+  value          String?
+  expected       String?
+  recommendation String
+  createdAt      DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  @@index([deviceId, code, resolvedAt])
+}
+model Maintenance {
+  id              String   @id @default(cuid())
+  deviceId        String
+  device          Device   @relation(fields: [deviceId], references: [id])
+  action          String
+  notes           String?
+  filterInstalledAt DateTime?
+  estimatedDue    DateTime?
+  createdAt       DateTime @default(now())
+}
+model ServiceRequest {
+  id          String   @id @default(cuid())
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id])
+  customerId  String
+  customer    User     @relation("CustomerRequests", fields: [customerId], references: [id])
+  status      String   @default("OPEN")
+  description String
+  createdAt   DateTime @default(now())
+}
+model Report {
+  id         String   @id @default(cuid())
+  deviceId   String
+  periodStart DateTime
+  periodEnd   DateTime
+  filePath   String?
+  createdAt  DateTime @default(now())
+}
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  createdAt DateTime @default(now())
+}
+model Technician {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String?
+  phone          String?
+  specialties    String[]
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  @@index([organizationId, active])
+}
+model BillingRecord {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  deviceId       String
+  device         Device       @relation(fields: [deviceId], references: [id])
+  customerId     String?
+  customer       User?        @relation("CustomerBilling", fields: [customerId], references: [id])
+  periodStart    DateTime
+  periodEnd      DateTime
+  amount         Decimal      @db.Decimal(12, 2)
+  currency       String       @default("INR")
+  status         String       @default("DRAFT")
+  createdAt      DateTime     @default(now())
+  @@index([organizationId, periodStart])
+  @@index([deviceId, periodStart])
+}
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
