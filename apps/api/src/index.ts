@@ -788,17 +788,27 @@ async function evaluate(deviceId: string, v: any) {
     ]);
   }
 
-  if (
-    v.turbidityNtu !== undefined &&
-    v.turbidityNtu > (c?.turbidityWarning ?? 5)
-  ) {
+  if (v.turbidityNtu !== undefined) {
+    // Use calibrated NTU when calibration is available.
+    if (v.turbidityNtu > (c?.turbidityWarning ?? 5)) {
+      checks.push([
+        'TURBIDITY',
+        'High turbidity',
+        Severity.YELLOW,
+        String(v.turbidityNtu),
+        `<= ${c?.turbidityWarning ?? 5} NTU`,
+        'Inspect filter and source water.'
+      ]);
+    }
+  } else if (v.rawTurbidity !== undefined && v.rawTurbidity <= 1500) {
+    // Provisional demo-only rule for this TS-300B setup; this is ADC, not NTU.
     checks.push([
-      'TURBIDITY',
-      'High turbidity',
+      'TURBIDITY_RAW_ADC',
+      'Turbidity warning (raw ADC)',
       Severity.YELLOW,
-      String(v.turbidityNtu),
-      `<= ${c?.turbidityWarning ?? 5} NTU`,
-      'Inspect filter and source water.'
+      String(v.rawTurbidity),
+      '> 1500 ADC for normal indication',
+      'Demo threshold only. Calibrate with turbidity standards before real-world use.'
     ]);
   }
 
